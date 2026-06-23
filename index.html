@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tickets history</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Warranty Team</p>
+        <h1>Tickets history</h1>
+        <p class="titleSub">Yesterday data only</p>
+      </div>
+      <div class="rulePanel" aria-label="Ticket rules">
+        <span><b>Removed</b> Z1/Z2/Z3/Z4/Z5/Z6/ZM/ZR/ZV/Y6/YA/YC -> Y0 Y1 Y2 Y4 Y5 Y7 Y8 7B YD Z8 Z9</span>
+      </div>
+      <div class="actions">
+        <div class="addTicketCoach">
+          <button id="addTicketButton" class="success">Add Missing Ticket</button>
+          <span class="addHint">If any Removed ticket is missing, click here.</span>
+        </div>
+        <label class="importButton">
+          <input id="fileInput" type="file" accept=".xls,.xml,.xlsx" multiple />
+          Import Excel
+        </label>
+        <button id="refreshButton" class="ghost">Refresh</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="sidebar">
+        <div class="sideHeader">
+          <span>Employees</span>
+          <strong id="employeeCount">0</strong>
+        </div>
+        <input id="employeeSearch" class="search" type="search" placeholder="Search employee" />
+        <div id="employeeList" class="employeeList"></div>
+      </aside>
+
+      <section class="content">
+        <div class="statusLine">
+          <span id="datasetStatus">No data imported yet.</span>
+          <span id="sourceStatus"></span>
+        </div>
+
+        <section class="summary">
+          <div class="person">
+            <p>Selected Employee</p>
+            <h2 id="employeeName">Select employee</h2>
+          </div>
+          <div class="metric">
+            <span><i class="metricIcon removedIcon">R</i>Removed</span>
+            <strong id="removedCount">0</strong>
+          </div>
+          <div class="metric">
+            <span><i class="metricIcon approvedIcon">A</i>Approved</span>
+            <strong id="approvedCount">0</strong>
+          </div>
+          <div class="metric warn">
+            <span><i class="metricIcon unapprovedIcon">!</i>Unapproved</span>
+            <strong id="unapprovedCount">0</strong>
+          </div>
+        </section>
+
+        <div class="toolbar">
+          <div id="tabs" class="tabs">
+            <button data-tab="removed" class="active">Removed</button>
+            <button data-tab="approved">Approved</button>
+            <button data-tab="unapproved">Unapproved</button>
+            <span class="manualTabCoach">
+              <button data-tab="manual">Manual Added</button>
+              <span class="manualHint">Added by you shows here, default empty, undo anytime.</span>
+            </span>
+          </div>
+          <div class="filters">
+            <label class="dateFilter">Date<input id="dateFilter" type="date" /></label>
+            <input id="tableSearch" class="search tableSearch" type="search" placeholder="Search ticket, customer, dealer, status" />
+          </div>
+        </div>
+
+        <section class="tableWrap">
+          <div id="markHint" class="markHint">If any ticket is wrong, please click !; double click ! to undo.</div>
+          <table>
+            <thead id="tableHead"></thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+          <div id="emptyState" class="emptyState">Import the two Excel files to begin.</div>
+        </section>
+      </section>
+    </main>
+
+    <div id="modalBackdrop" class="modalBackdrop">
+      <form id="manualTicketForm" class="modal">
+        <div class="modalHead">
+          <div>
+            <h2>Add Missing Ticket</h2>
+            <p>Saved to Firebase tempEmployeeTicketTable.</p>
+          </div>
+          <button type="button" id="modalClose" class="ghost">Close</button>
+        </div>
+        <label>Ticket number<input name="ticketId" required /></label>
+        <label>Employee<select id="manualEmployee" name="employee" required></select></label>
+        <label>Status<input name="status" value="Manual added" /></label>
+        <label>Note<textarea name="note" rows="3"></textarea></label>
+        <button class="success" type="submit">Save Missing Ticket</button>
+      </form>
+    </div>
+
+    <div class="friendlyNote">Just for verifying data. No stress and thank you for your help:)</div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
