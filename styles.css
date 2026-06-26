@@ -206,6 +206,18 @@ button,
   background: linear-gradient(135deg, var(--accent), var(--cyan));
 }
 
+.exportButton {
+  color: #075985;
+  background: #e0f2fe;
+  border-color: #bae6fd;
+}
+
+.exportButton:hover {
+  color: #fff;
+  background: #0284c7;
+  border-color: #0284c7;
+}
+
 .importButton input {
   display: none;
 }

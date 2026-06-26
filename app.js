@@ -36,6 +36,7 @@ const allowedEmployees = new Set([
 const el = {
   fileInput: document.querySelector("#fileInput"),
   addTicketButton: document.querySelector("#addTicketButton"),
+  exportAuditButton: document.querySelector("#exportAuditButton"),
   refreshButton: document.querySelector("#refreshButton"),
   dateFilter: document.querySelector("#dateFilter"),
   employeeSearch: document.querySelector("#employeeSearch"),
@@ -112,6 +113,8 @@ function manualRows() {
     amount: "",
     createdOn: clean(row.createdAt).slice(0, 10),
     lastUpdate: clean(row.updatedAt).slice(0, 10),
+    createdAt: clean(row.createdAt),
+    updatedAt: clean(row.updatedAt),
   })).filter((row) => isAssignedEmployee(row.employee));
 }
 
@@ -290,6 +293,96 @@ function normalizeTempData(data) {
     problemFlags: data?.problemFlags || {},
     manualTickets: data?.manualTickets || {},
   };
+}
+
+function allDashboardRows() {
+  const records = state.data?.records || {};
+  return [
+    ...(records.tickets || []),
+    ...(records.removed || []),
+    ...(records.approved || []),
+    ...(records.unapproved || []),
+    ...manualRows(),
+  ];
+}
+
+function exportAuditExcel() {
+  const problemRows = Object.entries(state.temp?.problemFlags || {}).map(([key, flag]) => {
+    const row = allDashboardRows().find((item) => recordKey(item) === key) || {};
+    const [type = "", ticketId = "", employee = ""] = key.split("|");
+    return {
+      Type: row.type || type,
+      "Ticket ID": row.ticketId || ticketId,
+      Employee: row.employee || employee,
+      Status: row.status || "",
+      Customer: row.customer || "",
+      "Claim Type": row.claimType || "",
+      Dealer: row.dealer || "",
+      "Aging Days": row.agingDays || "",
+      Amount: row.amount || "",
+      "Marked At": flag?.markedAt || "",
+      "Marked By": flag?.markedBy || "",
+      Key: key,
+    };
+  });
+
+  const manualAddedRows = manualRows().map((row) => ({
+    "Ticket ID": row.ticketId,
+    Employee: row.employee,
+    Status: row.status,
+    Note: row.note,
+    "Created At": row.createdAt,
+    "Updated At": row.updatedAt,
+    Key: row.manualKey,
+  }));
+
+  if (!problemRows.length && !manualAddedRows.length) {
+    alert("No problem or manual added tickets to export.");
+    return;
+  }
+
+  const workbook = buildWorkbookXml([
+    { name: "Problem Tickets", rows: problemRows },
+    { name: "Manual Added", rows: manualAddedRows },
+  ]);
+  const blob = new Blob([workbook], { type: "application/vnd.ms-excel;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `ticket-audit-${localDateKey(new Date())}.xls`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+function buildWorkbookXml(sheets) {
+  const body = sheets.map((sheet) => {
+    const headers = sheet.rows.length ? Object.keys(sheet.rows[0]) : [];
+    const rows = [
+      headers,
+      ...sheet.rows.map((row) => headers.map((header) => row[header])),
+    ];
+    return `<Worksheet ss:Name="${xmlEscape(sheet.name)}"><Table>${rows.map((row) => `<Row>${row.map((value) => `<Cell><Data ss:Type="String">${xmlEscape(value)}</Data></Cell>`).join("")}</Row>`).join("")}</Table></Worksheet>`;
+  }).join("");
+  return `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+${body}
+</Workbook>`;
+}
+
+function xmlEscape(value) {
+  return clean(value).replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&apos;",
+  })[char]);
 }
 
 async function importFiles(files) {
@@ -516,6 +609,7 @@ el.dateFilter.addEventListener("change", (event) => {
   render();
 });
 el.addTicketButton.addEventListener("click", openManualModal);
+el.exportAuditButton.addEventListener("click", exportAuditExcel);
 el.modalClose.addEventListener("click", closeManualModal);
 el.modalBackdrop.addEventListener("click", (event) => {
   if (event.target === el.modalBackdrop) closeManualModal();
@@ -527,13 +621,16 @@ el.manualTicketForm.addEventListener("submit", async (event) => {
   const employee = clean(form.get("employee"));
   if (!ticketId || !employee) return;
   const key = ["manual", ticketId, employee].join("|").toLowerCase();
+  const existing = state.temp.manualTickets[key] || {};
+  const now = new Date().toISOString();
   state.temp.manualTickets[key] = {
+    ...existing,
     ticketId,
     employee,
     status: clean(form.get("status")) || "Manual added",
     note: clean(form.get("note")),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: existing.createdAt || now,
+    updatedAt: now,
   };
   closeManualModal();
   state.tab = "manual";
