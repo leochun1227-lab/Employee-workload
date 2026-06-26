@@ -206,18 +206,6 @@ button,
   background: linear-gradient(135deg, var(--accent), var(--cyan));
 }
 
-.exportButton {
-  color: #075985;
-  background: #e0f2fe;
-  border-color: #bae6fd;
-}
-
-.exportButton:hover {
-  color: #fff;
-  background: #0284c7;
-  border-color: #0284c7;
-}
-
 .importButton input {
   display: none;
 }
@@ -433,19 +421,25 @@ button,
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 500;
+  color: #7c2d12;
+  font-size: 14px;
+  font-weight: 800;
+  padding: 6px 8px;
+  background: #fff7ed;
+  border: 1px solid rgba(251, 146, 60, 0.45);
+  border-radius: 10px;
+  box-shadow: 0 8px 18px rgba(251, 146, 60, 0.1);
 }
 
 .dateFilter input {
   height: 40px;
-  border: 1px solid var(--line);
+  border: 1px solid rgba(234, 88, 12, 0.55);
   border-radius: 6px;
   padding: 0 10px;
-  color: var(--ink);
-  background: #fff;
+  color: #7c2d12;
+  background: #fffbeb;
   font: inherit;
+  font-weight: 700;
 }
 
 .tabs {
