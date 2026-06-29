@@ -74,6 +74,14 @@ function localDateKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
+function localDateKeyFromValue(value) {
+  const text = clean(value);
+  if (!text) return "";
+  const date = new Date(text);
+  if (!Number.isNaN(date.getTime())) return localDateKey(date);
+  return normalizeDateKey(text);
+}
+
 function employeeKey(value) {
   return clean(value).toLowerCase();
 }
@@ -111,11 +119,11 @@ function manualRows() {
     dealer: "",
     agingDays: "",
     amount: "",
-    createdOn: clean(row.reviewDate || row.auditDate || row.createdAt).slice(0, 10),
-    lastUpdate: clean(row.updatedAt).slice(0, 10),
+    createdOn: localDateKeyFromValue(row.reviewDate || row.auditDate || row.createdAt),
+    lastUpdate: localDateKeyFromValue(row.updatedAt),
     createdAt: clean(row.createdAt),
     updatedAt: clean(row.updatedAt),
-    reviewDate: clean(row.reviewDate || row.auditDate || row.createdAt).slice(0, 10),
+    reviewDate: localDateKeyFromValue(row.reviewDate || row.auditDate || row.createdAt),
   })).filter((row) => isAssignedEmployee(row.employee));
 }
 
@@ -485,7 +493,7 @@ function exportChanges() {
       ticketType: parts[0] || "",
       ticketId: parts[1] || "",
       employee: parts[2] || "",
-      reviewDate: value?.reviewDate || "",
+      reviewDate: localDateKeyFromValue(value?.reviewDate || value?.markedAt),
       status: "",
       note: "",
       changedAt: value?.markedAt || "",
@@ -500,7 +508,7 @@ function exportChanges() {
       ticketType: "manual",
       ticketId: value?.ticketId || "",
       employee: value?.employee || "",
-      reviewDate: value?.reviewDate || value?.auditDate || "",
+      reviewDate: localDateKeyFromValue(value?.reviewDate || value?.auditDate || value?.createdAt),
       status: value?.status || "",
       note: value?.note || "",
       changedAt: value?.updatedAt || value?.createdAt || "",
