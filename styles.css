@@ -103,14 +103,18 @@ h1 {
   border-radius: 14px;
   font-size: 12px;
   line-height: 1.35;
-  text-align: center;
+  text-align: left;
 }
 
-.rulePanel span {
+.ruleLine {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px;
+  align-items: baseline;
   white-space: nowrap;
 }
 
-.rulePanel b {
+.ruleLine b {
   color: #0f172a;
   font-weight: 700;
 }
@@ -717,6 +721,11 @@ tr.manualRow td:last-child {
 
   .rulePanel span {
     white-space: normal;
+  }
+
+  .ruleLine {
+    grid-template-columns: 1fr;
+    gap: 2px;
   }
 
   .friendlyNote {

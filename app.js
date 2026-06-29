@@ -119,12 +119,16 @@ function manualRows() {
     dealer: "",
     agingDays: "",
     amount: "",
-    createdOn: localDateKeyFromValue(row.reviewDate || row.auditDate || row.createdAt),
+    createdOn: manualReviewDate(row),
     lastUpdate: localDateKeyFromValue(row.updatedAt),
     createdAt: clean(row.createdAt),
     updatedAt: clean(row.updatedAt),
-    reviewDate: localDateKeyFromValue(row.reviewDate || row.auditDate || row.createdAt),
+    reviewDate: manualReviewDate(row),
   })).filter((row) => isAssignedEmployee(row.employee));
+}
+
+function manualReviewDate(row) {
+  return localDateKeyFromValue(row?.reviewDate || row?.auditDate || row?.createdAt);
 }
 
 function parseWorkbookXml(text) {
@@ -269,7 +273,11 @@ async function loadData() {
     fetch(TEMP_URL, { cache: "no-store" }),
   ]);
   state.data = normalizeDashboardData(await dataResponse.json());
-  state.temp = normalizeTempData(await tempResponse.json());
+  const rawTemp = await tempResponse.json();
+  state.temp = normalizeTempData(rawTemp);
+  if (needsTempMigration(rawTemp)) {
+    await persistTempData(state.temp);
+  }
   state.firebaseWarning = "";
   const employees = visibleEmployees();
   if (!employees.some((employee) => employee.name === state.selectedEmployee)) {
@@ -297,11 +305,34 @@ function normalizeDashboardData(data) {
 }
 
 function normalizeTempData(data) {
+  const manualTickets = {};
+  Object.entries(data?.manualTickets || {}).forEach(([key, row]) => {
+    manualTickets[key] = {
+      ...row,
+      reviewDate: row?.reviewDate || row?.auditDate || localDateKeyFromValue(row?.createdAt),
+    };
+  });
+
+  const problemFlags = {};
+  Object.entries(data?.problemFlags || {}).forEach(([key, row]) => {
+    problemFlags[key] = {
+      ...row,
+      reviewDate: row?.reviewDate || localDateKeyFromValue(row?.markedAt),
+    };
+  });
+
   return {
     meta: { updatedAt: null, source: "employee-ticket-dashboard", ...(data?.meta || {}) },
-    problemFlags: data?.problemFlags || {},
-    manualTickets: data?.manualTickets || {},
+    problemFlags,
+    manualTickets,
   };
+}
+
+function needsTempMigration(rawTemp) {
+  const rawManual = rawTemp?.manualTickets || {};
+  const rawProblem = rawTemp?.problemFlags || {};
+  return Object.values(rawManual).some((row) => !clean(row?.reviewDate || row?.auditDate)) ||
+    Object.values(rawProblem).some((row) => !clean(row?.reviewDate));
 }
 
 async function importFiles(files) {
@@ -508,7 +539,7 @@ function exportChanges() {
       ticketType: "manual",
       ticketId: value?.ticketId || "",
       employee: value?.employee || "",
-      reviewDate: localDateKeyFromValue(value?.reviewDate || value?.auditDate || value?.createdAt),
+      reviewDate: manualReviewDate(value),
       status: value?.status || "",
       note: value?.note || "",
       changedAt: value?.updatedAt || value?.createdAt || "",
@@ -558,19 +589,27 @@ function formatExportDate(value) {
 
 async function saveTemp() {
   el.datasetStatus.textContent = "Saving changes...";
-  const payload = {
-    ...state.temp,
-    meta: { ...(state.temp.meta || {}), updatedAt: new Date().toISOString(), source: "public-site" },
-  };
-  const response = await fetch(TEMP_URL, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) throw new Error("Firebase save failed.");
+  const payload = buildTempPayload(state.temp);
+  await persistTempData(payload);
   state.temp = normalizeTempData(payload);
   state.firebaseWarning = "";
   render();
+}
+
+function buildTempPayload(temp) {
+  return {
+    ...temp,
+    meta: { ...(temp.meta || {}), updatedAt: new Date().toISOString(), source: "public-site" },
+  };
+}
+
+async function persistTempData(temp) {
+  const response = await fetch(TEMP_URL, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(buildTempPayload(temp)),
+  });
+  if (!response.ok) throw new Error("Firebase save failed.");
 }
 
 function openManualModal() {
