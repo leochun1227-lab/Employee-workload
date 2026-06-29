@@ -111,8 +111,11 @@ function manualRows() {
     dealer: "",
     agingDays: "",
     amount: "",
-    createdOn: clean(row.createdAt).slice(0, 10),
+    createdOn: clean(row.reviewDate || row.auditDate || row.createdAt).slice(0, 10),
     lastUpdate: clean(row.updatedAt).slice(0, 10),
+    createdAt: clean(row.createdAt),
+    updatedAt: clean(row.updatedAt),
+    reviewDate: clean(row.reviewDate || row.auditDate || row.createdAt).slice(0, 10),
   })).filter((row) => isAssignedEmployee(row.employee));
 }
 
@@ -482,6 +485,7 @@ function exportChanges() {
       ticketType: parts[0] || "",
       ticketId: parts[1] || "",
       employee: parts[2] || "",
+      reviewDate: value?.reviewDate || "",
       status: "",
       note: "",
       changedAt: value?.markedAt || "",
@@ -496,6 +500,7 @@ function exportChanges() {
       ticketType: "manual",
       ticketId: value?.ticketId || "",
       employee: value?.employee || "",
+      reviewDate: value?.reviewDate || value?.auditDate || "",
       status: value?.status || "",
       note: value?.note || "",
       changedAt: value?.updatedAt || value?.createdAt || "",
@@ -504,19 +509,20 @@ function exportChanges() {
       firebaseKey: key,
     });
   });
-  const headers = ["Change Type", "Ticket Type", "Ticket ID", "Employee", "Status", "Note", "Changed At", "Created At", "Updated At", "Firebase Key"];
+  const headers = ["Change Type", "Ticket Type", "Ticket ID", "Employee", "Review Date", "Status", "Note", "Changed At", "Created At", "Updated At", "Firebase Key"];
   const bodyRows = rows.length ? rows.map((row) => [
     row.changeType,
     row.ticketType,
     row.ticketId,
     row.employee,
+    row.reviewDate,
     row.status,
     row.note,
     formatExportDate(row.changedAt),
     formatExportDate(row.createdAt),
     formatExportDate(row.updatedAt),
     row.firebaseKey,
-  ]) : [["No changes", "", "", "", "", "", "", "", "", ""]];
+  ]) : [["No changes", "", "", "", "", "", "", "", "", "", ""]];
   const html = `<!doctype html><html><head><meta charset="utf-8"></head><body><table border="1"><thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead><tbody>${bodyRows.map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`).join("")}</tbody></table></body></html>`;
   const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -543,6 +549,7 @@ function formatExportDate(value) {
 }
 
 async function saveTemp() {
+  el.datasetStatus.textContent = "Saving changes...";
   const payload = {
     ...state.temp,
     meta: { ...(state.temp.meta || {}), updatedAt: new Date().toISOString(), source: "public-site" },
@@ -553,7 +560,7 @@ async function saveTemp() {
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error("Firebase save failed.");
-  state.temp = normalizeTempData(await response.json());
+  state.temp = normalizeTempData(payload);
   state.firebaseWarning = "";
   render();
 }
@@ -584,6 +591,7 @@ el.exportChangesButton.addEventListener("click", exportChanges);
 el.dateFilter.value = state.selectedDate;
 el.dateFilter.addEventListener("change", (event) => {
   state.selectedDate = event.target.value || yesterdayKey();
+  el.dateFilter.value = state.selectedDate;
   render();
 });
 el.addTicketButton.addEventListener("click", openManualModal);
@@ -598,18 +606,27 @@ el.manualTicketForm.addEventListener("submit", async (event) => {
   const employee = clean(form.get("employee"));
   if (!ticketId || !employee) return;
   const key = ["manual", ticketId, employee].join("|").toLowerCase();
+  const existing = state.temp.manualTickets[key] || {};
+  const now = new Date().toISOString();
   state.temp.manualTickets[key] = {
+    ...existing,
     ticketId,
     employee,
     status: clean(form.get("status")) || "Manual added",
     note: clean(form.get("note")),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: existing.createdAt || now,
+    updatedAt: now,
+    reviewDate: state.selectedDate || yesterdayKey(),
   };
   closeManualModal();
   state.tab = "manual";
   [...el.tabs.querySelectorAll("button")].forEach((tab) => tab.classList.toggle("active", tab.dataset.tab === "manual"));
-  await saveTemp();
+  try {
+    await saveTemp();
+  } catch (error) {
+    alert(error.message);
+    el.datasetStatus.textContent = "Save failed.";
+  }
 });
 el.employeeSearch.addEventListener("input", (event) => {
   state.employeeFilter = event.target.value;
@@ -628,7 +645,12 @@ el.tableBody.addEventListener("click", async (event) => {
       const problemKey = ["tickets", clean(row.ticketId), clean(row.employee)].join("|").toLowerCase();
       delete state.temp.problemFlags[problemKey];
       delete state.temp.manualTickets[key];
-      await saveTemp();
+      try {
+        await saveTemp();
+      } catch (error) {
+        alert(error.message);
+        el.datasetStatus.textContent = "Save failed.";
+      }
     }
     return;
   }
@@ -638,9 +660,14 @@ el.tableBody.addEventListener("click", async (event) => {
   if (state.temp.problemFlags[key]) {
     delete state.temp.problemFlags[key];
   } else {
-    state.temp.problemFlags[key] = { key, markedAt: new Date().toISOString(), markedBy: "Web user" };
+    state.temp.problemFlags[key] = { key, markedAt: new Date().toISOString(), markedBy: "Web user", reviewDate: state.selectedDate || yesterdayKey() };
   }
-  await saveTemp();
+  try {
+    await saveTemp();
+  } catch (error) {
+    alert(error.message);
+    el.datasetStatus.textContent = "Save failed.";
+  }
 });
 el.employeeList.addEventListener("click", (event) => {
   const button = event.target.closest("[data-employee]");
